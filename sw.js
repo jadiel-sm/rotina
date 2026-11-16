@@ -1,5 +1,5 @@
 // Funciona sem internet: abre o que está guardado e busca a versão nova por trás (aparece na próxima abertura).
-const CACHE = 'rotina-v1';
+const CACHE = 'rotina-v2';
 const ARQUIVOS = ['./', './index.html', './estilo.css', './rotina.js', './app.js', './manifest.webmanifest', './icones/icone-192.png', './icones/icone-512.png'];
 
 self.addEventListener('install', (e) => {

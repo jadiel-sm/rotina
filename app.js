@@ -54,14 +54,13 @@
     const p = R.placar(k, aj, r);
     const tipo = R.tipoDia(k);
     const treinoDia = R.ehDiaDeTreino(k, aj, r);
-    const letra = R.letraTreino(db.dias, k);
     const sono = R.horarioSono(k, aj);
     const nutri = R.diaNutri(k, aj);
-    const sub = { presencial: 'Dia útil · escritório', remoto: 'Sexta · remoto', fds: 'Fim de semana' }[tipo] + (treinoDia ? ' · Treino ' + letra : '');
+    const sub = { presencial: 'Dia útil · escritório', remoto: 'Sexta · remoto', fds: 'Lazer, descanso e desenvolvimento' }[tipo] + (treinoDia ? ' · dia de treino' : '');
     const nTreinos = treinosNaSemana(k);
-    const agoraMin = new Date().getHours() * 60 + new Date().getMinutes();
-    const proximo = k === hoje ? L.find((i) => i.tipo !== 'regra' && !R.feito(i, r)) : null;
-
+    const agora = new Date();
+    const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+    const destaque = k === hoje ? R.emDestaque(L, r, agoraMin) : null;
     let h = '';
     if (promptInstalar && k === hoje) {
       h += '<button class="faixa" data-acao="instalar">Instalar o app na tela inicial</button>';
@@ -75,6 +74,7 @@
     h += '<div class="placar"><div class="barra"><span style="width:' + Math.round(p.pct * 100) + '%"></span></div><b>' + p.feitos + '/' + p.total + '</b></div>';
 
     h += '<div class="chips">' +
+      (k === hoje ? '<span class="chip relogio">Agora ' + R.hora(agoraMin) + '</span>' : '') +
       '<span class="chip">Luz apagada ' + R.hora(sono.luz) + '</span>' +
       '<span class="chip">Treinos na semana ' + nTreinos + '/' + aj.metaTreinos + '</span>' +
       (nutri ? '<span class="chip">Nutri dia ' + nutri + '/14</span>' : '') + '</div>';
@@ -82,14 +82,14 @@
     h += '<ol class="linha">';
     for (const i of L) {
       if (i.tipo === 'regra') continue;
-      if (i.tipo === 'treino') { h += cartaoTreino(k, r, letra); continue; }
+      if (i.tipo === 'treino') { h += cartaoTreino(r); continue; }
       const ok = R.feito(i, r);
-      const ehProx = proximo && proximo.id === i.id;
-      h += '<li class="item' + (ok ? ' ok' : '') + (ehProx ? ' prox' : '') + '">' +
+      const ehProx = destaque && destaque.id === i.id;
+      h += '<li class="item' + (ok ? ' ok' : '') + (ehProx ? ' prox' : '') + (i.cat ? ' cat-' + i.cat : '') + '">' +
         '<button data-acao="marcar" data-id="' + i.id + '" aria-pressed="' + ok + '">' +
         '<span class="hora">' + esc(i.hora || '') + '</span>' +
         '<span class="txt"><b>' + esc(i.titulo) + '</b>' + (i.detalhe ? '<small>' + esc(i.detalhe) + '</small>' : '') +
-        (ehProx ? '<em>' + (i.min <= agoraMin ? 'agora' : 'próximo') + '</em>' : '') + '</span>' +
+        (ehProx ? '<em>' + (destaque.agora ? 'agora' : 'próximo') + '</em>' : '') + '</span>' +
         '<span class="caixa" aria-hidden="true"></span></button></li>';
     }
     h += '</ol>';
@@ -113,21 +113,13 @@
     return h;
   }
 
-  function cartaoTreino(k, r, letra) {
-    const aj = db.ajustes;
-    const exs = String(letra === 'A' ? aj.treinoA : aj.treinoB).split('\n').map((s) => s.trim()).filter(Boolean);
+  function cartaoTreino(r) {
     const t = r && r.treino;
-    let h = '<li class="treino' + (t ? ' ok' : '') + '"><div class="treino-cab"><span class="hora"></span><div><b>Treino ' + letra + '</b><small>Full-body · 40 min · academia do condomínio</small></div>';
-    if (!t) h += '<button class="mini" data-acao="treino-trocar">Trocar p/ ' + (letra === 'A' ? 'B' : 'A') + '</button>';
-    h += '</div>';
+    let h = '<li class="treino' + (t ? ' ok' : '') + '"><div class="treino-cab"><span class="hora"></span><div><b>Treino</b><small>40 min · academia do condomínio · siga o app de treino</small></div></div>';
     if (t) {
       h += '<p class="feito-msg">✓ ' + (t.modo === 'preguica' ? 'Dia de preguiça: aquecimento + 1 exercício. Contou!' : 'Treino completo.') +
         ' <button class="link" data-acao="treino-desfazer">desfazer</button></p>';
     } else {
-      if (exs.length) {
-        const marc = (r && r.exs) || {};
-        h += '<ul class="exs">' + exs.map((e, n) => '<li><label><input type="checkbox" data-acao="ex" data-n="' + n + '"' + (marc[n] ? ' checked' : '') + '> ' + esc(e) + '</label></li>').join('') + '</ul>';
-      }
       h += '<div class="botoes"><button class="btn" data-acao="treino-feito" data-modo="completo">Fiz o treino</button>' +
         '<button class="btn sec" data-acao="treino-feito" data-modo="preguica">Dia de preguiça<small>aquecimento + 1 exercício</small></button></div>';
     }
@@ -171,7 +163,9 @@
       ['Luz apagada no horário', conta(['dormir'])],
       ['Celular fora do quarto', conta(['celular'])],
       ['Sem açúcar / suco / mel', conta(['acucar'])],
-    ];
+      ['Faixas do fim de semana', conta(R.IDS_FAIXAS)],
+      ['Produção dos jantares', conta(['producao'])],
+    ].filter(([, c]) => c.total > 0);
 
     let h = '<h1 class="tit">Progresso</h1>';
     h += '<section class="cartao"><h2>Esta semana</h2>';
@@ -277,8 +271,7 @@
     h += '<section class="cartao"><h2>Treino</h2><p class="rot">Dias de academia</p><div class="dias">' +
       letras.map((l, i) => '<button class="dia-bt' + (aj.diasTreino.includes(i) ? ' on' : '') + '" data-acao="dia-treino" data-d="' + i + '" aria-label="' + R.NOMES_DIA[i] + '">' + l + '</button>').join('') + '</div>' +
       '<label>Meta por semana<input type="number" min="1" max="7" data-campo="metaTreinos" value="' + esc(aj.metaTreinos) + '"></label>' +
-      '<label>Exercícios do treino A <i>um por linha, opcional</i><textarea rows="5" data-campo="treinoA">' + esc(aj.treinoA) + '</textarea></label>' +
-      '<label>Exercícios do treino B <i>um por linha, opcional</i><textarea rows="5" data-campo="treinoB">' + esc(aj.treinoB) + '</textarea></label></section>';
+      '<p class="nota-peq">Os exercícios ficam no seu app de treino; aqui só conta se treinou.</p></section>';
 
     h += '<section class="cartao"><h2>Sono</h2>' +
       '<p class="destaque">Esta semana: telas ' + R.hora(sono.telas) + ' · luz apagada ' + R.hora(sono.luz) + '</p>' +
@@ -304,7 +297,7 @@
     h += '<section class="cartao"><h2>Backup</h2><p class="nota-peq">Os dados ficam só neste celular. Exporte de vez em quando e guarde o arquivo (Drive, e-mail).</p>' +
       '<div class="botoes"><button class="btn sec" data-acao="exportar">Exportar</button><button class="btn sec" data-acao="importar">Importar</button></div>' +
       '<input type="file" id="arquivo" accept="application/json,.json" hidden></section>';
-    h += '<p class="versao">Rotina · v1</p>';
+    h += '<p class="versao">Rotina · v2</p>';
     return h;
   }
 
@@ -329,14 +322,12 @@
     },
     'treino-feito'(b) {
       const r = reg(dataSel, true);
-      r.treino = { letra: R.letraTreino(db.dias, dataSel), modo: b.dataset.modo };
+      r.treino = { modo: b.dataset.modo };
       vibrar(); salvar(); render();
       aviso(b.dataset.modo === 'preguica' ? 'Contou! Melhor pouco do que nada.' : 'Treino registrado.');
     },
-    'treino-desfazer'() { const r = reg(dataSel, true); r.letra = r.treino && r.treino.letra; delete r.treino; salvar(); render(); },
-    'treino-trocar'() { const r = reg(dataSel, true); r.letra = R.letraTreino(db.dias, dataSel) === 'A' ? 'B' : 'A'; r.exs = {}; salvar(); render(); },
+    'treino-desfazer'() { const r = reg(dataSel, true); delete r.treino; salvar(); render(); },
     'treino-extra'() { const r = reg(dataSel, true); r.extra = !r.extra; salvar(); render(); },
-    ex(b) { const r = reg(dataSel, true); r.exs = r.exs || {}; r.exs[b.dataset.n] = b.checked; salvar(); },
     'dia-treino'(b) {
       const d = Number(b.dataset.d), L = db.ajustes.diasTreino;
       db.ajustes.diasTreino = L.includes(d) ? L.filter((x) => x !== d) : L.concat(d).sort();
@@ -374,13 +365,12 @@
 
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-acao]');
-    if (!b || !acoes[b.dataset.acao] || b.type === 'checkbox') return;
+    if (!b || !acoes[b.dataset.acao]) return;
     acoes[b.dataset.acao](b);
   });
 
   document.addEventListener('change', (e) => {
     const el = e.target;
-    if (el.type === 'checkbox' && el.dataset.acao === 'ex') { acoes.ex(el); return; }
     if (el.id === 'arquivo' && el.files[0]) {
       el.files[0].text().then((t) => {
         const novo = JSON.parse(t);
@@ -399,7 +389,7 @@
     } else if (campo === 'metaTreinos' || campo === 'minutosTelas') {
       const n = parseInt(el.value, 10);
       if (n >= 0) aj[campo] = n;
-    } else if (el.value || campo === 'treinoA' || campo === 'treinoB') {
+    } else if (el.value) {
       aj[campo] = el.value;
     }
     salvar(); render();
@@ -414,13 +404,15 @@
     tNota = setTimeout(salvar, 400);
   });
 
-  // Virou o dia com o app aberto: volta para hoje.
-  document.addEventListener('visibilitychange', () => {
+  // Acompanha o relógio: atualiza o destaque a cada minuto e, se virou o dia, volta para hoje.
+  function atualizar() {
     if (document.visibilityState !== 'visible') return;
     const agora = R.chave(new Date());
     if (agora !== hoje) { if (dataSel === hoje) dataSel = agora; hoje = agora; }
     if (!document.activeElement || !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) render();
-  });
+  }
+  document.addEventListener('visibilitychange', atualizar);
+  setInterval(() => { if (aba === 'hoje') atualizar(); }, 60000);
 
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); promptInstalar = e; render(); });
   window.addEventListener('appinstalled', () => { promptInstalar = null; render(); aviso('App instalado.'); });

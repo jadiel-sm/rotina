@@ -9,6 +9,9 @@
   --pri-claro: #e1eee8;
   --prox: #b8641f;
   --sobe: #b5482f;
+  --dev: #3d5fa8;
+  --lazer: #c2703f;
+  --desc: #7a68a8;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -23,6 +26,9 @@
     --pri-claro: #1d3a31;
     --prox: #e39a55;
     --sobe: #e7816a;
+    --dev: #8fb0f0;
+    --lazer: #eaa37a;
+    --desc: #b6a6e3;
     color-scheme: dark;
   }
 }
@@ -97,9 +103,12 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: 
 .treino-cab { display: flex; align-items: center; gap: 12px; }
 .treino-cab > div { flex: 1; display: flex; flex-direction: column; }
 .treino-cab b { font-size: 1.05rem; }
-.exs { list-style: none; padding: 0; margin: 10px 0 0 calc(3.6em + 12px); display: grid; gap: 6px; }
-.exs label { flex-direction: row; gap: 10px; align-items: center; margin: 0; font-size: 1rem; color: var(--tx); }
-.exs input { width: 20px; height: 20px; accent-color: var(--pri); }
+/* Faixas do fim de semana */
+.cat-dev button { border-left: 4px solid var(--dev); }
+.cat-lazer button { border-left: 4px solid var(--lazer); }
+.cat-descanso button { border-left: 4px solid var(--desc); }
+.cat-producao button { border-left: 4px solid var(--pri); }
+.chip.relogio { background: var(--tx); color: var(--bg); font-weight: 600; font-variant-numeric: tabular-nums; }
 .feito-msg { margin: 8px 0 0 calc(3.6em + 12px); color: var(--pri); font-weight: 600; }
 .botoes { display: flex; gap: 8px; margin-top: 10px; }
 .btn {

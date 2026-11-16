@@ -12,9 +12,22 @@
     inicioSono: null, // data em que a descida começou (AAAA-MM-DD)
     minutosTelas: 60, // telas desligadas X min antes da luz apagada
     inicioNutri: null, // data do dia 1 do cardápio de 14 dias
-    treinoA: '',
-    treinoB: '',
   };
+
+  // Fim de semana em faixas que intercalam desenvolvimento, lazer e descanso.
+  const CATEGORIAS = {
+    dev: { titulo: 'Desenvolvimento pessoal', detalhe: 'Estudo, leitura, curso, projeto' },
+    lazer: { titulo: 'Lazer', detalhe: 'O que der vontade: passeio, filme, jogo, encontro' },
+    descanso: { titulo: 'Descanso', detalhe: 'Sem obrigação: cochilo, sofá, nada' },
+  };
+  // [id, categoria, início, fim]
+  const FAIXAS = {
+    6: [['fx-dev1', 'dev', '08:30', '10:30'], ['fx-lazer1', 'lazer', '10:30', '12:00'], ['fx-desc1', 'descanso', '13:00', '14:30'],
+      ['fx-dev2', 'dev', '14:30', '16:00'], ['fx-lazer2', 'lazer', '16:00', '19:00']],
+    0: [['fx-dev1', 'dev', '08:30', '10:00'], ['fx-lazer1', 'lazer', '10:00', '12:00'], ['fx-desc1', 'descanso', '13:00', '14:30'],
+      ['producao', 'producao', '14:30', '17:00'], ['fx-lazer2', 'lazer', '17:00', '19:00']],
+  };
+  const IDS_FAIXAS = ['fx-dev1', 'fx-lazer1', 'fx-desc1', 'fx-dev2', 'fx-lazer2'];
 
   const NOMES_DIA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
@@ -71,16 +84,6 @@
     return aj.diasTreino.includes(data(k).getDay()) || !!(reg && (reg.extra || reg.treino));
   }
 
-  // Letra do treino do dia: a que já foi registrada, a escolhida na mão, ou o oposto do último treino feito.
-  function letraTreino(dias, k) {
-    const r = dias[k];
-    if (r && r.treino) return r.treino.letra;
-    if (r && r.letra) return r.letra;
-    const antes = Object.keys(dias).filter((x) => x < k && dias[x].treino).sort();
-    if (!antes.length) return 'A';
-    return dias[antes[antes.length - 1]].treino.letra === 'A' ? 'B' : 'A';
-  }
-
   function itens(k, aj, reg) {
     const dow = data(k).getDay();
     const tipo = tipoDia(k);
@@ -99,20 +102,27 @@
     L.push({ id: 'almoco', hora: '12h', min: 720, titulo: 'Almoço', detalhe: plano });
     if (util) L.push({ id: 'caminhada', min: 750, titulo: '15 min de caminhada', detalhe: 'Depois do almoço' });
     L.push({ id: 'lanche', hora: '15h30', min: 930, titulo: 'Lanche', detalhe: presencial ? 'Do estoque do escritório (opções da nutri)' : 'Opções da nutri' });
-    if (dow === 0) L.push({ id: 'producao', min: 960, titulo: 'Produzir os jantares de seg a qui', detalhe: 'Do plano da nutri' });
+
+    for (const [id, cat, ini, fim] of FAIXAS[dow] || []) {
+      const c = cat === 'producao'
+        ? { titulo: 'Produzir os jantares de seg a qui', detalhe: 'Do plano da nutri' }
+        : CATEGORIAS[cat];
+      L.push({ id, tipo: 'faixa', cat, hora: hora(min(ini)) + '–' + hora(min(fim)), min: min(ini), fim: min(fim), titulo: c.titulo, detalhe: c.detalhe });
+    }
 
     const jantaPronta = presencial ? 'Já pronta, só esquentar' : plano;
     if (treino) {
       L.push({ id: 'pretreino', hora: '17h30', min: 1050, titulo: 'Pré-treino', detalhe: '' });
       L.push({ id: 'descer', hora: presencial ? 'Chegada' : '', min: 1080, titulo: 'Trocar e descer pra academia', detalhe: 'Sem sofá antes' });
-      L.push({ id: 'treino', tipo: 'treino', min: 1110, titulo: 'Treino', detalhe: 'Full-body · 40 min' });
+      L.push({ id: 'treino', tipo: 'treino', min: 1110, titulo: 'Treino', detalhe: '40 min' });
       L.push({ id: 'janta', hora: 'Depois', min: 1170, titulo: 'Banho + janta', detalhe: jantaPronta });
     } else {
-      L.push({ id: 'janta', hora: presencial ? 'Chegada' : '', min: 1140, titulo: 'Janta', detalhe: jantaPronta });
+      L.push({ id: 'janta', hora: presencial ? 'Chegada' : tipo === 'fds' ? '19h' : '', min: 1140, titulo: 'Janta', detalhe: jantaPronta });
     }
 
     L.push({ id: 'telas', hora: hora(sono.telas), min: sono.telas, titulo: 'Telas desligadas', detalhe: 'Livro + chá sem mel nem leite' });
     L.push({ id: 'dormir', hora: hora(sono.luz), min: sono.luz, titulo: 'Luz apagada', detalhe: sono.naMeta ? 'Na meta de sono' : 'Descendo 15 min por semana até ' + hora(sono.meta) });
+    L.sort((a, b) => a.min - b.min);
 
     L.push({ id: 'celular', tipo: 'regra', titulo: 'Celular carregou fora do quarto' });
     L.push({ id: 'acucar', tipo: 'regra', titulo: 'Sem açúcar adicionado, suco ou mel fora do plano' });
@@ -131,7 +141,17 @@
     return { feitos: n, total: L.length, pct: L.length ? n / L.length : 0 };
   }
 
-  const api = { AJUSTES_PADRAO, NOMES_DIA, min, hora, chave, data, somaDias, diasEntre, segundaDaSemana, horarioSono, diaNutri, tipoDia, ehDiaDeTreino, letraTreino, itens, feito, placar };
+  // Item em destaque: a partir do que está acontecendo agora, o primeiro ainda não marcado.
+  function emDestaque(L, reg, agoraMin) {
+    const T = L.filter((i) => i.tipo !== 'regra');
+    let ini = 0;
+    T.forEach((i, n) => { if (i.min <= agoraMin) ini = n; });
+    const i = T.slice(ini).find((x) => !feito(x, reg));
+    if (!i) return null;
+    return { id: i.id, agora: i.min <= agoraMin };
+  }
+
+  const api = { AJUSTES_PADRAO, NOMES_DIA, IDS_FAIXAS, min, hora, chave, data, somaDias, diasEntre, segundaDaSemana, horarioSono, diaNutri, tipoDia, ehDiaDeTreino, itens, feito, placar, emDestaque };
   g.Rotina = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
